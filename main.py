@@ -1,6 +1,6 @@
 import streamlit as st
 import base64
-from typing import List, Dict
+from typing import Optional
 import os
 from dotenv import load_dotenv
 from openai import AzureOpenAI
@@ -9,7 +9,11 @@ from openai import AzureOpenAI
 load_dotenv()
 
 # Configure page settings
-st.set_page_config(page_title="Waifu", page_icon="🤖")
+st.set_page_config(
+    page_title="BOMBOLCAT🤖",
+    page_icon="🤖",
+    layout="centered",
+)
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
@@ -38,7 +42,10 @@ def encode_image(image_file) -> str:
     return base64.b64encode(image_file.read()).decode("ascii")
 
 
-def get_chatbot_response(text_input: str, image_file=None) -> str:
+def get_chatbot_response(
+    text_input: str,
+    image_file: Optional[st.runtime.uploaded_file_manager.UploadedFile] = None,
+) -> str:
     """Get response from Azure OpenAI API using SDK"""
     # Prepare message content
     message_content = []
@@ -61,7 +68,11 @@ def get_chatbot_response(text_input: str, image_file=None) -> str:
         {
             "role": "system",
             "content": "You are an AI assistant that helps people find information.",
-        }
+        },
+        {
+            "role": "user",
+            "content": "Give me the cpp code for this problem in the context of compiler design.Give something simple apt for a college student lab exam. Review the code to make sure it works ",
+        },
     ]
 
     # Add chat history
@@ -69,7 +80,7 @@ def get_chatbot_response(text_input: str, image_file=None) -> str:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
     # Add current message
-    messages.append({"role": "user", "content": message_content})
+    messages.append({"role": "user", "content": text_input})
 
     try:
         response = client.chat.completions.create(
@@ -90,52 +101,42 @@ def clear_chat():
 
 
 # Streamlit UI
-st.title("DL God 🤖")
+st.title("Bombolcat🤖")
 
+# Chat message interface
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
 
-# File uploader for images
-image_file = st.file_uploader("Upload an image (optional)", type=["png", "jpg", "jpeg"])
+# User input container
+image_file = None  # Initialize image_file
+with st.container():
+    user_input = st.chat_input("Type your message here...")
+    toggle = st.toggle("Upload an image", False)
+    if toggle:
+        image_file = st.file_uploader(
+            "Upload an image (optional)", type=["png", "jpg", "jpeg"]
+        )
+    else:
+        image_file = None
 
-# Display uploaded image
-if image_file:
-    st.image(image_file, caption="Uploaded Image", use_container_width=True)
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
 
-# Text input
-text_input = st.text_input("Enter your message:", key="text_input")
+        # Display the latest user input
+        with st.chat_message("user"):
+            st.write(user_input)
 
-# Create two columns for the buttons
-col1, col2 = st.columns([1, 1])
-
-# Send button
-with col1:
-    if st.button("Send", key="send"):
-        if text_input or image_file:
-            # Add user message to chat history
-            st.session_state.messages.append({"role": "user", "content": text_input})
-
-            # Get bot response
-            bot_response = get_chatbot_response(text_input, image_file)
-
+        # Get bot response
+        with st.chat_message("assistant"):
+            bot_response = get_chatbot_response(user_input, image_file)
             if bot_response:
-                # Add bot response to chat history
+                st.write(bot_response)
                 st.session_state.messages.append(
                     {"role": "assistant", "content": bot_response}
                 )
-        else:
-            st.warning("Please enter a message or upload an image.")
 
 # Clear chat button
-with col2:
-    if st.button("Clear Chat", key="clear"):
-        clear_chat()
-        st.rerun()
-
-# Display chat history
-st.subheader("Chat History")
-for message in st.session_state.messages:
-    with st.container():
-        if message["role"] == "user":
-            st.write("You: " + message["content"])
-        else:
-            st.write("Bot: " + message["content"])
-        st.divider()
+if st.button("Clear Chat"):
+    clear_chat()
+    st.experimental_rerun()
